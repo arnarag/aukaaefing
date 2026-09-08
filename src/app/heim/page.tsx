@@ -17,7 +17,7 @@ function HomeContent() {
   const [latest, setLatest] = useState<LocalWorkoutSession | null>();
   const [weeklyCompleted, setWeeklyCompleted] = useState(0);
   useEffect(() => { if (player) void Promise.all([getActiveSession(player.id), getLatestCompletedSession(player.id), getCompletedSessions(player.id)]).then(([a, l, completed]) => { setActive(a); setLatest(l); setWeeklyCompleted(completedMainWorkoutsThisWeek(completed, new Set(shortWorkouts.map(({ id }) => id)))); }); }, [player]);
-  const workout = active ? getWorkout(active.workoutId) : getWorkout("w2")!;
+  const workout = (active ? getWorkout(active.workoutId) : undefined) ?? getWorkout("w2")!;
   const { defaultCompletedMainWorkouts: goal, recommendedWorkoutSlots: slots } = fourWeekProgram.weeklyGoal;
   return <ChildShell><section className="pt-3">
     <p className="text-sm font-extrabold uppercase tracking-[.18em] text-pitch-700">Gaman að sjá þig</p>
