@@ -33,3 +33,6 @@ jobs:
 
       - name: Build production application
         run: npm run build
+
+      - name: Build Cloudflare Worker
+        run: npm run build:cloudflare
