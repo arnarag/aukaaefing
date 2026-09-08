@@ -4,7 +4,7 @@
   "main": ".open-next/worker.js",
   "workers_dev": true,
   "preview_urls": true,
-  "compatibility_date": "2025-03-01",
+  "compatibility_date": "2026-09-08",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "binding": "ASSETS",
