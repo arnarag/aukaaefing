@@ -68,14 +68,18 @@ export async function createPlayer(input: PlayerInput): Promise<Player> {
 
 export async function updatePlayer(id: string, input: PlayerInput): Promise<Player> {
   const client = requireClient();
+  const updatePayload: Record<string, unknown> = {
+    name: input.name.trim(),
+    birth_year: input.birthYear ?? null,
+    preferred_foot: input.preferredFoot ?? null,
+  };
+  if (Object.prototype.hasOwnProperty.call(input, "avatarKey")) {
+    updatePayload.avatar_key = input.avatarKey ?? null;
+  }
+
   const { data, error } = await client
     .from("players")
-    .update({
-      name: input.name.trim(),
-      avatar_key: input.avatarKey ?? null,
-      birth_year: input.birthYear ?? null,
-      preferred_foot: input.preferredFoot ?? null,
-    })
+    .update(updatePayload)
     .eq("id", id)
     .select("id,name,avatar_key,birth_year,preferred_foot,archived_at")
     .single();
