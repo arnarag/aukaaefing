@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const single = vi.fn();
 const select = vi.fn(() => ({ single }));
-const insert = vi.fn(() => ({ select }));
+const insert = vi.fn((payload: Record<string, unknown>) => ({ payload, select }));
 const from = vi.fn(() => ({ insert }));
 
 vi.mock("./client", () => ({
