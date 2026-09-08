@@ -84,3 +84,48 @@ For substantial work:
 4. Run lint, typecheck and relevant tests before finishing.
 5. Report what changed, what was tested, and known limitations.
 6. Push back on unnecessary complexity.
+
+## Pull request requirements
+
+Every pull request created by Codex must contain a non-technical summary intended for the product owner.
+
+Use this structure:
+
+### What changed
+Explain in plain language what the user will notice.
+
+### Why
+Explain which requested behavior this implements or fixes.
+
+### User-facing impact
+Describe exactly what changes for a child or parent using Aukaæfing.
+
+### Regression risk
+Rate LOW / MEDIUM / HIGH.
+
+Explain:
+- existing behavior touched by the change,
+- what could plausibly break,
+- what was done to check for regressions.
+
+Never claim that regressions are impossible.
+
+### Verification
+Report actual results for:
+- lint
+- typecheck
+- tests
+- production build
+- relevant browser/UI testing
+
+Do not say a check passed unless it was actually run successfully.
+
+### Deployment impact
+State whether the change affects:
+- Cloudflare configuration
+- environment variables
+- database/schema
+- PWA/service worker
+- dependencies
+
+Call out any manual deployment step explicitly.
