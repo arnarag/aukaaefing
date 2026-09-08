@@ -11,15 +11,15 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     const complete = async () => {
-      const client = getSupabaseBrowserClient();
-      if (!client) { setError(true); return; }
-
       const search = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       if (callbackHasError(search, hash)) { setError(true); return; }
 
       const { code, accessToken } = callbackEvidence(search, hash);
       if (!code && !accessToken) { setError(true); return; }
+
+      const client = getSupabaseBrowserClient();
+      if (!client) { setError(true); return; }
 
       if (code) {
         const { data, error: exchangeError } = await client.auth.exchangeCodeForSession(code);
