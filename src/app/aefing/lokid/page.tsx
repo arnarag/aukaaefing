@@ -1,0 +1,8 @@
+"use client";
+
+import Link from "next/link";
+import { CheckIcon } from "@heroicons/react/24/solid";
+import { ChildShell } from "@/components/child-shell";
+import { RequirePlayer } from "@/components/require-player";
+
+export default function CompletedPage() { return <RequirePlayer><ChildShell hideNavigation><div className="flex min-h-[calc(100dvh-80px)] flex-col items-center justify-center py-8 text-center"><div className="grid size-24 place-items-center rounded-full bg-pitch-600 text-white shadow-lg"><CheckIcon className="size-14" /></div><p className="mt-7 text-sm font-extrabold uppercase tracking-[.2em] text-pitch-700">Æfingu lokið</p><h1 className="mt-2 text-5xl font-black">Vel gert!</h1><p className="mt-4 max-w-sm text-lg leading-relaxed text-slate-600">Æfingin er örugglega vistuð á þessu tæki. Góð vinna skiptir mestu.</p><div className="mt-8 w-full rounded-3xl bg-white p-5 shadow-card"><p className="text-sm font-extrabold uppercase tracking-[.15em] text-slate-500">Markmið vikunnar</p><div className="mt-3 grid grid-cols-3 gap-2"><div className="grid h-12 place-items-center rounded-xl bg-pitch-600 text-white"><CheckIcon className="size-6" /></div><div className="grid h-12 place-items-center rounded-xl bg-slate-100"><span className="size-3 rounded-full bg-slate-300" /></div><div className="grid h-12 place-items-center rounded-xl bg-slate-100"><span className="size-3 rounded-full bg-slate-300" /></div></div><p className="mt-3 font-bold">1 af 2 æfingum kláruð</p><p className="mt-1 text-sm text-slate-500">Þriðja æfingin er aukabónus.</p></div><Link href="/heim" className="mt-8 flex min-h-16 w-full items-center justify-center rounded-2xl bg-pitch-600 text-xl font-black text-white">KLÁRA</Link></div></ChildShell></RequirePlayer>; }
