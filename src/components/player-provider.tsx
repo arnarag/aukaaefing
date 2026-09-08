@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { fixturePlayers, PLAYER_STORAGE_KEY, type Player } from "@/domain/players";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -30,29 +30,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>(fixturePlayers);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const refreshVersion = useRef(0);
 
   const applyPlayers = useCallback((nextPlayers: Player[]) => {
-    const available = nextPlayers.length > 0 ? nextPlayers : fixturePlayers;
-    setPlayers(available);
+    setPlayers(nextPlayers);
     const storedId = localStorage.getItem(PLAYER_STORAGE_KEY);
-    setPlayer(available.find((candidate) => candidate.id === storedId));
+    setPlayer(nextPlayers.find((candidate) => candidate.id === storedId));
   }, []);
 
   const refreshPlayers = useCallback(async () => {
+    const requestVersion = ++refreshVersion.current;
     const client = getSupabaseBrowserClient();
+
     if (!client) {
+      if (requestVersion !== refreshVersion.current) return;
       setSignedIn(false);
       applyPlayers(fixturePlayers);
       return;
     }
+
     const { data } = await client.auth.getSession();
-    const hasSession = Boolean(data.session);
-    setSignedIn(hasSession);
-    if (!hasSession) {
+    if (requestVersion !== refreshVersion.current) return;
+
+    const userId = data.session?.user.id;
+    if (!userId) {
+      setSignedIn(false);
       applyPlayers(fixturePlayers);
       return;
     }
+
+    setSignedIn(true);
     const persisted = await listPlayers();
+    const currentSession = (await client.auth.getSession()).data.session;
+    if (requestVersion !== refreshVersion.current || currentSession?.user.id !== userId) return;
+
     applyPlayers(persisted);
   }, [applyPlayers]);
 
@@ -75,6 +86,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
     return () => {
       active = false;
+      refreshVersion.current += 1;
       subscription.subscription.unsubscribe();
     };
   }, [refreshPlayers]);
