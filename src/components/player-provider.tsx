@@ -60,6 +60,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSignedIn(true);
+    applyPlayers([]);
+
     const persisted = await listPlayers();
     const currentSession = (await client.auth.getSession()).data.session;
     if (requestVersion !== refreshVersion.current || currentSession?.user.id !== userId) return;
