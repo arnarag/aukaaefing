@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { callbackEvidence, callbackHasError, safeLocalRedirect } from "./callback-utils";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function AuthCallbackPage() {
@@ -13,20 +14,26 @@ export default function AuthCallbackPage() {
       const client = getSupabaseBrowserClient();
       if (!client) { setError(true); return; }
 
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
+      const search = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      if (callbackHasError(search, hash)) { setError(true); return; }
+
+      const { code, accessToken } = callbackEvidence(search, hash);
+      if (!code && !accessToken) { setError(true); return; }
+
       if (code) {
-        const { error: exchangeError } = await client.auth.exchangeCodeForSession(code);
-        if (exchangeError) { setError(true); return; }
+        const { data, error: exchangeError } = await client.auth.exchangeCodeForSession(code);
+        if (exchangeError || !data.session) { setError(true); return; }
       } else {
-        const { data } = await client.auth.getSession();
-        if (!data.session) {
+        let session = (await client.auth.getSession()).data.session;
+        if (!session) {
           await new Promise((resolve) => setTimeout(resolve, 500));
-          const retry = await client.auth.getSession();
-          if (!retry.data.session) { setError(true); return; }
+          session = (await client.auth.getSession()).data.session;
         }
+        if (!session || session.access_token !== accessToken) { setError(true); return; }
       }
-      router.replace(params.get("next") || "/leikmenn");
+
+      router.replace(safeLocalRedirect(search.get("next")));
     };
     void complete();
   }, [router]);
