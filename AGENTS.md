@@ -129,3 +129,25 @@ State whether the change affects:
 - dependencies
 
 Call out any manual deployment step explicitly.
+
+## Code review priorities
+
+When reviewing Aukaæfing pull requests, prioritize:
+
+1. Regression bugs in existing child-facing flows.
+2. Loss or corruption of player progress.
+3. Offline/resume failures.
+4. Incorrect personal-best calculations.
+5. Player data leaking between profiles.
+6. Broken mobile/touch behavior.
+7. English text appearing in user-facing UI.
+8. Training content being altered from the approved source.
+9. PWA/install regressions.
+10. Cloudflare deployment incompatibilities.
+
+Distinguish:
+- confirmed bug,
+- credible regression risk,
+- suggestion.
+
+Do not block a PR for stylistic preferences.
