@@ -13,8 +13,8 @@ export type Player = {
 };
 
 export const fixturePlayers: Player[] = [
-  { id: "player-elin", name: "Guðmundur", avatar: "⚽", color: "bg-amber-100", persisted: false },
-  { id: "player-kari", name: "Björn", avatar: "🧤", color: "bg-sky-100", persisted: false },
+  { id: "player-gudmundur", name: "Guðmundur", avatar: "⚽", color: "bg-amber-100", persisted: false },
+  { id: "player-bjorn", name: "Björn", avatar: "🧤", color: "bg-sky-100", persisted: false },
 ];
 
 export const PLAYER_STORAGE_KEY = "aukaaefing:selected-player";
