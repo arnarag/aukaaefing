@@ -28,7 +28,12 @@ Connect this GitHub repository to a **Workers Builds** project and use:
 - Production branch: `main`
 - Build command: `npm run build:cloudflare`
 - Deploy command: `npm run deploy:cloudflare`
+- Non-production branch deploy command: `npm run upload:cloudflare`
 - Root directory: `/`
+
+The OpenNext CLI should perform both production deploys and non-production
+version uploads. Do not replace these with raw `wrangler deploy` or
+`wrangler versions upload` commands for this OpenNext application.
 
 Workers Builds creates preview versions for non-production branches and deploys
 the production branch to the Worker. Keep branch build triggers enabled for pull
@@ -45,8 +50,9 @@ the Cloudflare Git integration.
 ## Configuration basis
 
 This setup follows Cloudflare's official
-[Next.js on Workers guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/)
-and its
-[Workers Builds Git integration guide](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/).
+[OpenNext adapter guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/),
+the
+[Workers Builds configuration guide](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/),
+and OpenNext's Workers Builds guidance.
 OpenNext is used because it supports the project's existing Next.js 15 release;
 the application does not need a framework upgrade or migration.
