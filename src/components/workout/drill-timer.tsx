@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatTime, secondsRemaining } from "@/domain/timer";
 
 export function DrillTimer({ initialSeconds }: { initialSeconds: number }) {
-  const [remaining, setRemaining] = useState(initialSeconds); const [running, setRunning] = useState(false); const endAt = useRef<number>();
+  const [remaining, setRemaining] = useState(initialSeconds); const [running, setRunning] = useState(false); const endAt = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!running) return;
     const tick = () => { const next = secondsRemaining(endAt.current ?? Date.now(), Date.now()); setRemaining(next); if (next === 0) setRunning(false); };

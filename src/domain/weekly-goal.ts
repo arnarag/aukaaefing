@@ -2,7 +2,7 @@ import type { LocalWorkoutSession } from "./session";
 
 export function reykjavikIsoWeekKey(value: string | Date) {
   const date = new Date(value);
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en", { timeZone: "Europe/Reykjavik", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date).map(({ type, value: part }) => [type, part]));
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en", { timeZone: "Atlantic/Reykjavik", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date).map(({ type, value: part }) => [type, part]));
   const current = new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00Z`);
   const weekday = current.getUTCDay() || 7;
   current.setUTCDate(current.getUTCDate() + 4 - weekday);
