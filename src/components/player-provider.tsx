@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { fixturePlayers, PLAYER_STORAGE_KEY, type Player } from "@/domain/players";
+import { fixturePlayers, legacyFixturePlayers, PLAYER_STORAGE_KEY, type Player } from "@/domain/players";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listPlayers } from "@/lib/supabase/player-repository";
+import { hasAnySession } from "@/lib/offline/workout-db";
+import { readCachedPersistedPlayers, writeCachedPersistedPlayers } from "@/lib/offline/player-cache";
 
 type PlayerContextValue = {
   player?: Player;
@@ -25,6 +27,25 @@ const PlayerContext = createContext<PlayerContextValue>({
   refreshPlayers: async () => undefined,
 });
 
+async function localFixturePlayers() {
+  const storedId = localStorage.getItem(PLAYER_STORAGE_KEY);
+  const legacy: Player[] = [];
+
+  for (const candidate of legacyFixturePlayers) {
+    if (candidate.id === storedId) {
+      legacy.push(candidate);
+      continue;
+    }
+    try {
+      if (await hasAnySession(candidate.id)) legacy.push(candidate);
+    } catch {
+      // IndexedDB can be unavailable in private/restricted contexts; current fixtures still work.
+    }
+  }
+
+  return [...fixturePlayers, ...legacy];
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [player, setPlayer] = useState<Player>();
   const [players, setPlayers] = useState<Player[]>(fixturePlayers);
@@ -38,14 +59,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPlayer(nextPlayers.find((candidate) => candidate.id === storedId));
   }, []);
 
+  const applySignedOutFixtures = useCallback(async (requestVersion: number) => {
+    const available = await localFixturePlayers();
+    if (requestVersion !== refreshVersion.current) return;
+    setSignedIn(false);
+    applyPlayers(available);
+  }, [applyPlayers]);
+
   const refreshPlayers = useCallback(async () => {
     const requestVersion = ++refreshVersion.current;
     const client = getSupabaseBrowserClient();
 
     if (!client) {
-      if (requestVersion !== refreshVersion.current) return;
-      setSignedIn(false);
-      applyPlayers(fixturePlayers);
+      await applySignedOutFixtures(requestVersion);
       return;
     }
 
@@ -54,20 +80,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     const userId = data.session?.user.id;
     if (!userId) {
-      setSignedIn(false);
-      applyPlayers(fixturePlayers);
+      await applySignedOutFixtures(requestVersion);
       return;
     }
 
     setSignedIn(true);
-    applyPlayers([]);
+    const cached = readCachedPersistedPlayers(userId);
+    applyPlayers(cached);
 
-    const persisted = await listPlayers();
-    const currentSession = (await client.auth.getSession()).data.session;
-    if (requestVersion !== refreshVersion.current || currentSession?.user.id !== userId) return;
+    try {
+      const persisted = await listPlayers();
+      const currentSession = (await client.auth.getSession()).data.session;
+      if (requestVersion !== refreshVersion.current || currentSession?.user.id !== userId) return;
 
-    applyPlayers(persisted);
-  }, [applyPlayers]);
+      writeCachedPersistedPlayers(userId, persisted);
+      applyPlayers(persisted);
+    } catch {
+      const currentSession = (await client.auth.getSession()).data.session;
+      if (requestVersion !== refreshVersion.current || currentSession?.user.id !== userId) return;
+      // Keep the last player list authorized for this exact user so an active workout can resume offline.
+      applyPlayers(cached);
+    }
+  }, [applyPlayers, applySignedOutFixtures]);
 
   useEffect(() => {
     let active = true;
