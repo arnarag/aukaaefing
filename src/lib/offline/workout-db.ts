@@ -35,3 +35,8 @@ export async function getCompletedSessions(playerId: string) {
   const sessions = await (await database()).getAllFromIndex("sessions", "by-player", playerId);
   return sessions.filter((session) => session.status === "completed");
 }
+
+export async function hasAnySession(playerId: string) {
+  const sessions = await (await database()).getAllFromIndex("sessions", "by-player", playerId);
+  return sessions.length > 0;
+}
