@@ -17,10 +17,15 @@ export const fixturePlayers: Player[] = [
   { id: "player-bjorn", name: "Björn", avatar: "🧤", color: "bg-sky-100", persisted: false },
 ];
 
+export const legacyFixturePlayers: Player[] = [
+  { id: "player-elin", name: "Elín", avatar: "⚽", color: "bg-amber-100", persisted: false },
+  { id: "player-kari", name: "Kári", avatar: "🧤", color: "bg-sky-100", persisted: false },
+];
+
 export const PLAYER_STORAGE_KEY = "aukaaefing:selected-player";
 
 export function getFixturePlayer(id: string | null) {
-  return fixturePlayers.find((player) => player.id === id);
+  return [...fixturePlayers, ...legacyFixturePlayers].find((player) => player.id === id);
 }
 
 export function playerPresentation(avatarKey?: string | null) {
