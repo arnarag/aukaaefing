@@ -80,6 +80,11 @@ export function withPracticeTimer(session: LocalWorkoutSession, timer: PracticeT
   return touched(session, { ...saved, timer });
 }
 
+export function resetPracticeTimer(session: LocalWorkoutSession): LocalWorkoutSession {
+  const saved = getPracticeProgress(session);
+  return touched(session, { ...saved, phase: "ready", timer: undefined });
+}
+
 export function completePracticeTimer(session: LocalWorkoutSession): LocalWorkoutSession {
   const saved = getPracticeProgress(session);
   return touched(session, {
@@ -98,6 +103,16 @@ export function completePracticeRound(session: LocalWorkoutSession, totalRounds:
     currentRound,
     completedRounds,
     phase: completedRounds >= totalRounds ? "result" : "rest",
+    timer: undefined,
+  });
+}
+
+export function repeatPracticeRound(session: LocalWorkoutSession): LocalWorkoutSession {
+  const saved = getPracticeProgress(session);
+  return touched(session, {
+    currentRound: saved.currentRound,
+    completedRounds: Math.max(0, Math.min(saved.completedRounds, saved.currentRound - 1)),
+    phase: "ready",
     timer: undefined,
   });
 }
