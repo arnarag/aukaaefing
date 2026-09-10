@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { ChildShell } from "@/components/child-shell";
@@ -10,26 +10,51 @@ import { getActiveSession, saveSession } from "@/lib/offline/workout-db";
 import {
   advanceSession,
   completePracticeRound,
+  completePracticeTimer,
   completeSession,
   getPracticeProgress,
   startNextPracticeRound,
+  withPracticeTimer,
   type DrillResult,
   type LocalWorkoutSession,
+  type PracticeTimerSnapshot,
 } from "@/domain/session";
 import { getWorkout } from "@/content/programs/four-week";
-import { DrillTimer, type DrillTimerStatus } from "@/components/workout/drill-timer";
+import { DrillTimer } from "@/components/workout/drill-timer";
 import { PracticeActionBar } from "@/components/workout/practice-action-bar";
 import { ResultEntry, type ResultDraft } from "@/components/workout/result-entry";
+import { useScreenWakeLock } from "@/lib/practice/use-screen-wake-lock";
 
 function ActiveWorkout() {
   const { player } = usePlayer();
   const router = useRouter();
   const [session, setSession] = useState<LocalWorkoutSession>();
+  const sessionRef = useRef<LocalWorkoutSession>();
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [viewDrillIndex, setViewDrillIndex] = useState<number>();
   const [draft, setDraft] = useState<ResultDraft>({});
-  const [timerStatus, setTimerStatus] = useState<DrillTimerStatus>("ready");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useScreenWakeLock(Boolean(session && session.status === "active"));
+
+  const enqueueSave = useCallback((updated: LocalWorkoutSession) => {
+    const pending = saveQueue.current.then(() => saveSession(updated));
+    saveQueue.current = pending.catch(() => undefined);
+    return pending;
+  }, []);
+
+  const applyPracticeUpdate = useCallback((update: (current: LocalWorkoutSession) => LocalWorkoutSession) => {
+    const current = sessionRef.current;
+    if (!current) return Promise.resolve();
+    const updated = update(current);
+    sessionRef.current = updated;
+    setSession(updated);
+    setError("");
+    return enqueueSave(updated).catch(() => {
+      setError("Ekki tókst að vista stöðuna. Æfingin er enn opin á skjánum.");
+    });
+  }, [enqueueSave]);
 
   useEffect(() => {
     if (!player) return;
@@ -38,6 +63,7 @@ function ActiveWorkout() {
         router.replace("/heim");
         return;
       }
+      sessionRef.current = saved;
       setSession(saved);
       setViewDrillIndex(saved.currentDrillIndex);
     });
@@ -45,8 +71,8 @@ function ActiveWorkout() {
 
   useEffect(() => {
     if (!session) return;
+    sessionRef.current = session;
     setViewDrillIndex(session.currentDrillIndex);
-    setTimerStatus("ready");
   }, [session?.currentDrillIndex]);
 
   const workout = session ? getWorkout(session.workoutId) : undefined;
@@ -56,25 +82,32 @@ function ActiveWorkout() {
   const reviewingPrevious = Boolean(session && shownIndex < session.currentDrillIndex);
   const practice = session ? getPracticeProgress(session) : undefined;
 
-  const persistPracticeChange = useCallback(async (updated: LocalWorkoutSession) => {
-    setSaving(true);
-    setError("");
-    try {
-      await saveSession(updated);
-      setSession(updated);
-    } catch {
-      setError("Ekki tókst að vista stöðuna. Prófaðu aftur.");
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const persistTimerSnapshot = useCallback((snapshot: PracticeTimerSnapshot) => {
+    void applyPracticeUpdate((current) => withPracticeTimer(current, snapshot));
+  }, [applyPracticeUpdate]);
 
-  const finishIntervalRound = useCallback(() => {
-    if (!session || !workout) return;
-    const currentDrill = workout.drills[session.currentDrillIndex];
+  const finishWorkTimer = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    const currentWorkout = getWorkout(current.workoutId);
+    const currentDrill = currentWorkout?.drills[current.currentDrillIndex];
+    if (!currentDrill) return;
+
+    if (currentDrill.interval) {
+      void applyPracticeUpdate((latest) => completePracticeRound(latest, currentDrill.interval!.rounds));
+      return;
+    }
+    void applyPracticeUpdate((latest) => completePracticeTimer(latest));
+  }, [applyPracticeUpdate]);
+
+  const finishRestTimer = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    const currentWorkout = getWorkout(current.workoutId);
+    const currentDrill = currentWorkout?.drills[current.currentDrillIndex];
     if (!currentDrill?.interval) return;
-    void persistPracticeChange(completePracticeRound(session, currentDrill.interval.rounds));
-  }, [persistPracticeChange, session, workout]);
+    void applyPracticeUpdate((latest) => startNextPracticeRound(latest, currentDrill.interval!.rounds));
+  }, [applyPracticeUpdate]);
 
   if (!session || !workout || !drill || !practice) {
     return <ChildShell immersive><div className="grid min-h-[70vh] place-items-center font-bold text-pitch-700">Sæki vistaða æfingu…</div></ChildShell>;
@@ -83,13 +116,13 @@ function ActiveWorkout() {
   const currentDrill = workout.drills[session.currentDrillIndex];
   const isCurrentDrill = shownIndex === session.currentDrillIndex;
   const currentHasTimer = Boolean(currentDrill.interval || currentDrill.durationSeconds || currentDrill.durationMinutes);
-  const intervalComplete = Boolean(currentDrill.interval && practice.phase === "result");
-  const canEnterResult = isCurrentDrill && !reviewingPrevious && (currentDrill.interval ? intervalComplete : !currentHasTimer || timerStatus === "finished");
+  const canEnterResult = isCurrentDrill && !reviewingPrevious && (!currentHasTimer || practice.phase === "result");
   const needsResult = Boolean(currentDrill.measurement && currentDrill.measurement.type !== "COMPLETED");
   const validResult = !needsResult || (currentDrill.measurement?.type === "FREE_CHOICE" ? Boolean(draft.choice) : draft.value !== undefined);
 
   const finishCurrentDrill = async () => {
-    if (!validResult || saving) return;
+    const latest = sessionRef.current;
+    if (!latest || !validResult || saving) return;
     setSaving(true);
     setError("");
 
@@ -98,12 +131,13 @@ function ActiveWorkout() {
       result = { drillId: currentDrill.id, measurementType: currentDrill.measurement.type, ...draft };
     }
 
-    const advanced = advanceSession(session, currentDrill.id, result);
+    const advanced = advanceSession(latest, currentDrill.id, result);
     const isLast = advanced.currentDrillIndex >= workout.drills.length;
     const updated = isLast ? completeSession(advanced) : advanced;
 
     try {
-      await saveSession(updated);
+      await enqueueSave(updated);
+      sessionRef.current = updated;
       if (isLast) {
         router.replace(`/aefing/lokid?session=${updated.id}`);
         return;
@@ -111,7 +145,6 @@ function ActiveWorkout() {
       setSession(updated);
       setViewDrillIndex(updated.currentDrillIndex);
       setDraft({});
-      setTimerStatus("ready");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setError("Ekki tókst að vista. Prófaðu aftur áður en þú heldur áfram.");
@@ -120,15 +153,20 @@ function ActiveWorkout() {
     }
   };
 
-  const startNextRound = () => {
+  const startNextRound = async () => {
     if (!currentDrill.interval || saving) return;
-    void persistPracticeChange(startNextPracticeRound(session, currentDrill.interval.rounds));
+    setSaving(true);
+    await applyPracticeUpdate((latest) => startNextPracticeRound(latest, currentDrill.interval!.rounds));
+    setSaving(false);
   };
 
   const finalActionLabel = session.currentDrillIndex === workout.drills.length - 1 ? "KLÁRA ÆFINGU" : "NÆSTA VERKEFNI";
   const timerSeconds = currentDrill.interval?.workSeconds ?? currentDrill.durationSeconds ?? (currentDrill.durationMinutes?.min ?? 1) * 60;
-  const showCurrentTimer = isCurrentDrill && !reviewingPrevious && currentHasTimer && (!currentDrill.interval || practice.phase === "ready");
+  const showWorkTimer = isCurrentDrill && !reviewingPrevious && currentHasTimer && practice.phase === "ready";
+  const showRestTimer = Boolean(isCurrentDrill && !reviewingPrevious && currentDrill.interval?.restSeconds && practice.phase === "rest");
   const showResult = canEnterResult && currentDrill.measurement;
+  const workTimer = practice.timer?.kind === "work" ? practice.timer : undefined;
+  const restTimer = practice.timer?.kind === "rest" ? practice.timer : undefined;
 
   return <ChildShell immersive>
     <article className="min-h-[calc(100dvh-2rem)] pb-8">
@@ -164,20 +202,35 @@ function ActiveWorkout() {
 
       {!reviewingPrevious && currentDrill.interval && practice.phase === "rest" && <div className="mt-6 rounded-3xl bg-white p-6 text-center shadow-card">
         <p className="text-2xl font-black">Umferð {practice.completedRounds} lokið</p>
-        <p className="mt-2 text-lg font-bold text-slate-600">{currentDrill.interval.restSeconds ? `Hvíldu í ${currentDrill.interval.restSeconds} sekúndur.` : "Þegar þú ert tilbúinn skaltu byrja næstu umferð."}</p>
+        {!currentDrill.interval.restSeconds && <p className="mt-2 text-lg font-bold text-slate-600">Þegar þú ert tilbúinn skaltu byrja næstu umferð.</p>}
       </div>}
 
       {!reviewingPrevious && currentDrill.interval && practice.phase === "result" && <div className="mt-6 rounded-3xl bg-pitch-100 p-5 text-center">
         <p className="text-xl font-black text-pitch-900">Allar {currentDrill.interval.rounds} umferðir kláraðar</p>
       </div>}
 
-      {showCurrentTimer && <div className="mt-6">
+      {showWorkTimer && <div className="mt-6">
         <DrillTimer
-          key={`${currentDrill.id}-${practice.currentRound}`}
+          key={`${currentDrill.id}-${practice.currentRound}-work`}
           initialSeconds={timerSeconds}
+          kind="work"
           startLabel={currentDrill.interval ? `BYRJA UMFERÐ ${practice.currentRound}` : "BYRJA TÍMA"}
-          onComplete={currentDrill.interval ? finishIntervalRound : undefined}
-          onStatusChange={setTimerStatus}
+          savedTimer={workTimer}
+          onSnapshot={persistTimerSnapshot}
+          onComplete={finishWorkTimer}
+        />
+      </div>}
+
+      {showRestTimer && currentDrill.interval?.restSeconds && <div className="mt-5">
+        <DrillTimer
+          key={`${currentDrill.id}-${practice.currentRound}-rest`}
+          initialSeconds={currentDrill.interval.restSeconds}
+          kind="rest"
+          startLabel="BYRJA HVÍLD"
+          savedTimer={restTimer}
+          autoStart={!restTimer}
+          onSnapshot={persistTimerSnapshot}
+          onComplete={finishRestTimer}
         />
       </div>}
 
@@ -192,8 +245,8 @@ function ActiveWorkout() {
       <button onClick={() => setViewDrillIndex(session.currentDrillIndex)} className="min-h-16 w-full rounded-2xl bg-pitch-600 px-4 text-lg font-black text-white shadow-lg">AFTUR Í NÚVERANDI VERKEFNI</button>
     </PracticeActionBar>}
 
-    {!reviewingPrevious && currentDrill.interval && practice.phase === "rest" && <PracticeActionBar>
-      <button onClick={startNextRound} disabled={saving} className="min-h-16 w-full rounded-2xl bg-pitch-600 px-4 text-xl font-black text-white shadow-lg disabled:bg-slate-300">{saving ? "VISTA…" : `BYRJA UMFERÐ ${practice.currentRound + 1}`}</button>
+    {!reviewingPrevious && currentDrill.interval && practice.phase === "rest" && !currentDrill.interval.restSeconds && <PracticeActionBar>
+      <button onClick={() => void startNextRound()} disabled={saving} className="min-h-16 w-full rounded-2xl bg-pitch-600 px-4 text-xl font-black text-white shadow-lg disabled:bg-slate-300">{saving ? "VISTA…" : `BYRJA UMFERÐ ${practice.currentRound + 1}`}</button>
     </PracticeActionBar>}
 
     {!reviewingPrevious && canEnterResult && <PracticeActionBar>
