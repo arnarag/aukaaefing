@@ -171,7 +171,6 @@ export function DrillTimer({
 
   const finishEarly = () => {
     if (running || countdown !== null) pause(false);
-    setFinished(true);
     onFinishEarlyRef.current?.();
   };
 
