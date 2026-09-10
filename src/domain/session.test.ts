@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   advanceSession,
   completePracticeRound,
+  completePracticeTimer,
   completeSession,
   getPracticeProgress,
   startNextPracticeRound,
+  withPracticeTimer,
   type LocalWorkoutSession,
 } from "./session";
 
@@ -48,5 +50,32 @@ describe("æfingalota", () => {
     const third = startNextPracticeRound(afterSecond, 3);
     const afterThird = completePracticeRound(third, 3);
     expect(getPracticeProgress(afterThird)).toEqual({ phase: "result", currentRound: 3, completedRounds: 3 });
+  });
+
+  it("geymir stöðu tímamælis svo hægt sé að halda áfram", () => {
+    const saved = withPracticeTimer(session, {
+      kind: "work",
+      status: "paused",
+      totalSeconds: 60,
+      remainingSeconds: 37,
+    });
+    expect(getPracticeProgress(saved).timer).toEqual({
+      kind: "work",
+      status: "paused",
+      totalSeconds: 60,
+      remainingSeconds: 37,
+    });
+  });
+
+  it("hreinsar tímamæli þegar verkefnistíma lýkur", () => {
+    const active = withPracticeTimer(session, {
+      kind: "work",
+      status: "active",
+      totalSeconds: 60,
+      remainingSeconds: 60,
+      endAt: "2026-01-01T00:01:00.000Z",
+    });
+    const finished = completePracticeTimer(active);
+    expect(getPracticeProgress(finished)).toEqual({ phase: "result", currentRound: 1, completedRounds: 0 });
   });
 });

@@ -7,12 +7,23 @@ export type DrillResult = {
   measurementType: MeasurementType;
 };
 
-export type PracticePhase = "ready" | "countdown" | "active" | "paused" | "rest" | "result";
+export type PracticePhase = "ready" | "rest" | "result";
+export type PracticeTimerKind = "work" | "rest";
+export type PracticeTimerStatus = "ready" | "active" | "paused";
+
+export type PracticeTimerSnapshot = {
+  kind: PracticeTimerKind;
+  status: PracticeTimerStatus;
+  totalSeconds: number;
+  remainingSeconds: number;
+  endAt?: string;
+};
 
 export type PracticeProgress = {
   phase: PracticePhase;
   currentRound: number;
   completedRounds: number;
+  timer?: PracticeTimerSnapshot;
 };
 
 export type LocalWorkoutSession = {
@@ -45,14 +56,37 @@ const touched = (session: LocalWorkoutSession, practice: PracticeProgress): Loca
 });
 
 export function getPracticeProgress(session: LocalWorkoutSession): PracticeProgress {
-  const saved = session.practice;
+  const saved = session.practice as (Partial<PracticeProgress> & { phase?: string }) | undefined;
   if (!saved) return initialPracticeProgress();
 
+  const phase: PracticePhase = saved.phase === "rest" || saved.phase === "result" ? saved.phase : "ready";
+  const timer = saved.timer && saved.timer.totalSeconds > 0
+    ? {
+        ...saved.timer,
+        remainingSeconds: Math.max(0, Math.min(saved.timer.remainingSeconds, saved.timer.totalSeconds)),
+      }
+    : undefined;
+
   return {
-    phase: saved.phase ?? "ready",
+    phase,
     currentRound: Math.max(1, saved.currentRound ?? 1),
     completedRounds: Math.max(0, saved.completedRounds ?? 0),
+    ...(timer ? { timer } : {}),
   };
+}
+
+export function withPracticeTimer(session: LocalWorkoutSession, timer: PracticeTimerSnapshot): LocalWorkoutSession {
+  const saved = getPracticeProgress(session);
+  return touched(session, { ...saved, timer });
+}
+
+export function completePracticeTimer(session: LocalWorkoutSession): LocalWorkoutSession {
+  const saved = getPracticeProgress(session);
+  return touched(session, {
+    ...saved,
+    phase: "result",
+    timer: undefined,
+  });
 }
 
 export function completePracticeRound(session: LocalWorkoutSession, totalRounds: number): LocalWorkoutSession {
@@ -64,6 +98,7 @@ export function completePracticeRound(session: LocalWorkoutSession, totalRounds:
     currentRound,
     completedRounds,
     phase: completedRounds >= totalRounds ? "result" : "rest",
+    timer: undefined,
   });
 }
 
@@ -75,6 +110,7 @@ export function startNextPracticeRound(session: LocalWorkoutSession, totalRounds
     currentRound,
     completedRounds: Math.min(saved.completedRounds, totalRounds),
     phase: "ready",
+    timer: undefined,
   });
 }
 
