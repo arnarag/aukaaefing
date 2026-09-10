@@ -29,7 +29,7 @@ function ActiveWorkout() {
   const { player } = usePlayer();
   const router = useRouter();
   const [session, setSession] = useState<LocalWorkoutSession>();
-  const sessionRef = useRef<LocalWorkoutSession>();
+  const sessionRef = useRef<LocalWorkoutSession | undefined>(undefined);
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [viewDrillIndex, setViewDrillIndex] = useState<number>();
   const [draft, setDraft] = useState<ResultDraft>({});
