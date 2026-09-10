@@ -7,6 +7,10 @@ import { PracticeActionBar } from "@/components/workout/practice-action-bar";
 import { playPracticeCue, unlockPracticeAudio, vibratePracticeCue } from "@/lib/practice/cues";
 
 function remainingFromSaved(timer: PracticeTimerSnapshot, initialSeconds: number) {
+  if (timer.status === "active" && timer.endAt) {
+    const end = Date.parse(timer.endAt);
+    if (Number.isFinite(end)) return secondsRemaining(end, Date.now());
+  }
   return Math.max(0, Math.min(timer.remainingSeconds, initialSeconds));
 }
 
@@ -37,11 +41,12 @@ export function DrillTimer({
     () => savedTimer?.kind === kind && savedTimer.totalSeconds === initialSeconds ? savedTimer : undefined,
     [initialSeconds, kind, savedTimer],
   );
-  const [remaining, setRemaining] = useState(() => restored ? remainingFromSaved(restored, initialSeconds) : initialSeconds);
+  const initialRestored = useRef(restored).current;
+  const [remaining, setRemaining] = useState(() => initialRestored ? remainingFromSaved(initialRestored, initialSeconds) : initialSeconds);
   const [running, setRunning] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
-  const [interrupted, setInterrupted] = useState(Boolean(restored && restored.status !== "ready"));
+  const [interrupted, setInterrupted] = useState(Boolean(initialRestored && initialRestored.status !== "ready"));
   const endAt = useRef<number | undefined>(undefined);
   const autoStarted = useRef(false);
   const completionSent = useRef(false);
@@ -137,18 +142,18 @@ export function DrillTimer({
   }, [pause]);
 
   useEffect(() => {
-    if (!restored || restored.status !== "active") return;
-    const next = remainingFromSaved(restored, initialSeconds);
+    if (!initialRestored || initialRestored.status !== "active") return;
+    const next = remainingFromSaved(initialRestored, initialSeconds);
     setRemaining(next);
     setInterrupted(true);
     emitSnapshot("paused", next);
-  }, [emitSnapshot, initialSeconds, restored]);
+  }, [emitSnapshot, initialRestored, initialSeconds]);
 
   useEffect(() => {
-    if (!autoStart || restored || autoStarted.current || remaining <= 0) return;
+    if (!autoStart || initialRestored || autoStarted.current || remaining <= 0) return;
     autoStarted.current = true;
     beginRunning();
-  }, [autoStart, beginRunning, remaining, restored]);
+  }, [autoStart, beginRunning, initialRestored, remaining]);
 
   const toggle = () => {
     if (running || countdown !== null) {
