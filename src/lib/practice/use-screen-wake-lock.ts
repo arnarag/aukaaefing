@@ -16,6 +16,7 @@ type WakeLockNavigator = Navigator & {
 
 export function useScreenWakeLock(enabled = true) {
   const sentinelRef = useRef<WakeLockSentinelLike | null>(null);
+  const requestInFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (!enabled || typeof navigator === "undefined" || typeof document === "undefined") return;
@@ -24,28 +25,39 @@ export function useScreenWakeLock(enabled = true) {
 
     let mounted = true;
 
-    const request = async () => {
-      if (!mounted || document.visibilityState !== "visible" || sentinelRef.current) return;
-      try {
-        const sentinel = await wakeLock.request("screen");
-        if (!mounted) {
-          await sentinel.release();
-          return;
+    const request = () => {
+      if (!mounted || document.visibilityState !== "visible" || sentinelRef.current || requestInFlightRef.current) return;
+
+      const pending = (async () => {
+        try {
+          const sentinel = await wakeLock.request("screen");
+          if (!mounted || document.visibilityState !== "visible") {
+            if (!sentinel.released) await sentinel.release();
+            return;
+          }
+
+          const previous = sentinelRef.current;
+          if (previous && previous !== sentinel && !previous.released) await previous.release();
+
+          sentinelRef.current = sentinel;
+          sentinel.addEventListener("release", () => {
+            if (sentinelRef.current === sentinel) sentinelRef.current = null;
+          });
+        } catch {
+          // Wake lock is a progressive enhancement. Practice must still work without it.
+        } finally {
+          requestInFlightRef.current = null;
         }
-        sentinelRef.current = sentinel;
-        sentinel.addEventListener("release", () => {
-          if (sentinelRef.current === sentinel) sentinelRef.current = null;
-        });
-      } catch {
-        // Wake lock is a progressive enhancement. Practice must still work without it.
-      }
+      })();
+
+      requestInFlightRef.current = pending;
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void request();
+      if (document.visibilityState === "visible") request();
     };
 
-    void request();
+    request();
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
