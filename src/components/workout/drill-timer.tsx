@@ -10,13 +10,17 @@ export function DrillTimer({
   initialSeconds,
   startLabel = "BYRJA TÍMA",
   resetLabel = "ENDURSTILLA TÍMA",
+  finishEarlyLabel = "KLÁRA VERKEFNI",
   onComplete,
+  onFinishEarly,
   onStatusChange,
 }: {
   initialSeconds: number;
   startLabel?: string;
   resetLabel?: string;
+  finishEarlyLabel?: string;
   onComplete?: () => void;
+  onFinishEarly?: () => void;
   onStatusChange?: (status: DrillTimerStatus) => void;
 }) {
   const [remaining, setRemaining] = useState(initialSeconds);
@@ -65,6 +69,7 @@ export function DrillTimer({
   };
 
   const canReset = running || finished || remaining !== initialSeconds;
+  const canFinishEarly = Boolean(onFinishEarly) && !running && !finished;
 
   return <>
     <div className="rounded-3xl bg-ink p-5 text-center text-white">
@@ -77,6 +82,7 @@ export function DrillTimer({
       <button onClick={toggle} className="min-h-16 w-full rounded-2xl bg-pitch-600 px-4 text-xl font-black text-white shadow-lg">
         {running ? "PÁSA" : remaining === initialSeconds ? startLabel : "HALDA ÁFRAM"}
       </button>
+      {canFinishEarly && <button type="button" onClick={onFinishEarly} className="mt-2 min-h-12 w-full rounded-xl px-4 text-base font-black text-pitch-800 underline decoration-pitch-300 underline-offset-4">{finishEarlyLabel}</button>}
     </PracticeActionBar>}
   </>;
 }
