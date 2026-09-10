@@ -136,6 +136,12 @@ function ActiveWorkout() {
     }
   };
 
+  const finishTimedPartEarly = () => {
+    // For measured non-interval drills, the timer becoming finished reveals result entry.
+    // Interval drills in the current programme do not require a separate measurement.
+    if (currentDrill.interval || !needsResult) void finishCurrentDrill();
+  };
+
   const startNextRound = () => {
     if (!currentDrill.interval || saving || pendingSave) return;
     void persistPracticeChange(startNextPracticeRound(session, currentDrill.interval.rounds));
@@ -191,7 +197,9 @@ function ActiveWorkout() {
           initialSeconds={timerSeconds}
           startLabel={currentDrill.interval ? `BYRJA UMFERÐ ${practice.currentRound}` : "BYRJA TÍMA"}
           resetLabel={currentDrill.interval ? `ENDURTAKA UMFERÐ ${practice.currentRound}` : "ENDURSTILLA TÍMA"}
+          finishEarlyLabel={currentDrill.interval ? "KLÁRA VERKEFNI" : needsResult ? "SKRÁ NIÐURSTÖÐU" : "KLÁRA VERKEFNI"}
           onComplete={currentDrill.interval ? finishIntervalRound : undefined}
+          onFinishEarly={finishTimedPartEarly}
           onStatusChange={setTimerStatus}
         />
       </div>}
@@ -210,6 +218,7 @@ function ActiveWorkout() {
 
     {!pendingSave && currentDrill.interval && practice.phase === "rest" && <PracticeActionBar>
       <button onClick={startNextRound} disabled={saving} className="min-h-16 w-full rounded-2xl bg-pitch-600 px-4 text-xl font-black text-white shadow-lg disabled:bg-slate-300">{saving ? "VISTA…" : `BYRJA UMFERÐ ${practice.currentRound + 1}`}</button>
+      <button type="button" onClick={() => void finishCurrentDrill()} disabled={saving} className="mt-2 min-h-12 w-full rounded-xl px-4 text-base font-black text-pitch-800 underline decoration-pitch-300 underline-offset-4 disabled:text-slate-400">KLÁRA VERKEFNI</button>
     </PracticeActionBar>}
 
     {!pendingSave && canEnterResult && <PracticeActionBar>
